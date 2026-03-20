@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hirth Joint Optimiser</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;1,300&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0b0e13; --surface:#111520; --card:#161c2a;
+  --border:#1f2a3d; --border2:#2a3a55;
+  --text:#c8d4ea; --muted:#546080; --bright:#e8f0ff;
+  --accent:#3b82f6; --green:#22d3a0; --amber:#f59e0b;
+  --red:#f43f5e; --purple:#a78bfa; --cyan:#22d3ee; --orange:#fb923c;
+  --radius:8px;
+}
+html,body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;}
+.shell{max-width:1340px;margin:0 auto;padding:22px 18px 48px;}
+
+/* Header */
+header{display:flex;align-items:flex-end;gap:20px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+header h1{font-size:19px;font-weight:600;color:var(--bright);letter-spacing:-.01em;}
+header p{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px;}
+.badge{margin-left:auto;flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 10px;border:1px solid var(--accent);border-radius:20px;color:var(--accent);letter-spacing:.07em;white-space:nowrap;}
+
+/* Main layout: left panel | right panel */
+.main-grid{display:grid;grid-template-columns:380px 1fr;gap:16px;}
+.left-col{display:flex;flex-direction:column;gap:14px;}
+.right-col{display:flex;flex-direction:column;gap:14px;}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+.card-title{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.card-title::before{content:'';display:inline-block;width:3px;height:12px;border-radius:2px;flex-shrink:0;}
+.card-title.accent-blue::before{background:var(--accent);}
+.card-title.accent-orange::before{background:var(--orange);}
+.card-title.accent-purple::before{background:var(--purple);}
+
+/* Section divider within a card */
+.section-divider{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--border2);margin:12px 0 10px;padding-bottom:5px;border-bottom:1px dashed var(--border);}
+
+/* Params */
+.param-list{display:flex;flex-direction:column;gap:13px;}
+.param{display:flex;flex-direction:column;gap:3px;}
+.param-name{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--bright);}
+.param-name sub{font-size:9px;}
+.param-controls{display:flex;align-items:center;gap:8px;}
+
+input[type=range]{-webkit-appearance:none;flex:1;height:3px;background:var(--border2);border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);box-shadow:0 0 0 1px var(--accent);cursor:pointer;transition:transform .15s,box-shadow .15s;}
+input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.2);box-shadow:0 0 0 3px rgba(59,130,246,.3);}
+input[type=range].orange-thumb::-webkit-slider-thumb{background:var(--orange);box-shadow:0 0 0 1px var(--orange);}
+input[type=range].orange-thumb:hover::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(251,146,60,.3);}
+
+input[type=number]{width:76px;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--amber);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;padding:4px 6px;outline:none;transition:border-color .2s;-moz-appearance:textfield;text-align:right;}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+input[type=number]:focus{border-color:var(--accent);}
+.param-unit{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;min-width:30px;}
+.param-range{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--border2);}
+.param-desc{font-size:11px;color:var(--muted);line-height:1.4;margin-top:1px;}
+
+/* Output grid */
+.out-grid{display:grid;gap:8px;}
+.out-grid-5{grid-template-columns:repeat(5,1fr);}
+.out-grid-4{grid-template-columns:repeat(4,1fr);}
+.out-grid-3{grid-template-columns:repeat(3,1fr);}
+.out-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 12px 10px;position:relative;overflow:hidden;}
+.out-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.col-Fa::before{background:var(--red);}    .col-Fa .out-sym{color:var(--red);}
+.col-Ft::before{background:var(--green);}  .col-Ft .out-sym{color:var(--green);}
+.col-Ftt::before{background:var(--cyan);}  .col-Ftt .out-sym{color:var(--cyan);}
+.col-Fn::before{background:var(--purple);} .col-Fn .out-sym{color:var(--purple);}
+.col-sig::before{background:var(--orange);}  .col-sig .out-sym{color:var(--orange);}
+.col-A::before{background:var(--amber);}   .col-A .out-sym{color:var(--amber);}
+.col-pre::before{background:var(--red);}   .col-pre .out-sym{color:var(--red);}
+.out-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px;}
+.out-sym{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;margin-bottom:2px;}
+.out-val{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;color:var(--bright);line-height:1.1;}
+.out-utag{font-size:10px;color:var(--muted);font-weight:400;margin-left:2px;}
+.out-formula{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--border2);margin-top:4px;line-height:1.5;}
+
+/* Stress state badge */
+.stress-badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;padding:2px 7px;border-radius:10px;margin-top:5px;letter-spacing:.05em;}
+.badge-ok{background:rgba(34,211,160,.15);color:var(--green);border:1px solid rgba(34,211,160,.3);}
+.badge-warn{background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.3);}
+.badge-over{background:rgba(244,63,94,.15);color:var(--red);border:1px solid rgba(244,63,94,.3);}
+
+/* Bars */
+.bar-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;}
+.bar-header{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;}
+.bar-eq{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:8px;}
+.bar-track{height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:4px;}
+.bar-fill{height:100%;border-radius:5px;transition:width .3s cubic-bezier(.4,0,.2,1),background .3s;}
+.bar-limits{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--border2);}
+
+/* Insight */
+.insight{margin-top:8px;padding:8px 11px;background:var(--surface);border-radius:5px;border-left:3px solid var(--green);font-size:11px;color:var(--muted);line-height:1.6;}
+.insight strong{color:var(--green);}
+.insight.warn{border-color:var(--amber);} .insight.warn strong{color:var(--amber);}
+.insight.bad{border-color:var(--red);}   .insight.bad strong{color:var(--red);}
+
+/* Opt banner */
+.opt-banner{padding:10px 13px;background:rgba(34,211,160,.04);border:1px solid rgba(34,211,160,.15);border-radius:var(--radius);font-size:11px;color:var(--muted);line-height:1.55;}
+.opt-banner strong{color:var(--green);}
+.opt-banner code{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--amber);background:rgba(245,158,11,.1);padding:1px 4px;border-radius:3px;}
+
+/* Chart */
+.chart-tabs{display:flex;gap:5px;margin-bottom:11px;flex-wrap:wrap;}
+.ctab{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.04em;padding:4px 11px;border:1px solid var(--border2);border-radius:20px;background:none;color:var(--muted);cursor:pointer;transition:all .18s;}
+.ctab.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.ctab:hover:not(.active){border-color:var(--accent);color:var(--accent);}
+canvas{display:block;border-radius:4px;}
+
+/* Allowable stress input row */
+.sigma-row{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 10px;background:rgba(251,146,60,.06);border:1px solid rgba(251,146,60,.2);border-radius:6px;}
+.sigma-row label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--orange);flex-shrink:0;}
+.sigma-row input[type=number]{color:var(--orange);}
+.sigma-row input[type=number]:focus{border-color:var(--orange);}
+.sigma-row .sigma-hint{font-size:10px;color:var(--muted);flex:1;}
+
+@media(max-width:1000px){.main-grid{grid-template-columns:1fr;} .out-grid-5{grid-template-columns:repeat(3,1fr);} .out-grid-4{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header>
+  <div>
+    <h1>Hirth Joint — Force &amp; Stress Optimiser</h1>
+    <p>// MINIMISE F_a · SUBJECT TO σ &lt; σ_allowable · SYMMETRIC TOOTH · RADIAL CROSS-SECTION</p>
+  </div>
+  <div class="badge">LIVE CALCULATION</div>
+</header>
+
+<div class="main-grid">
+
+<!-- ═══════════════════════════════ LEFT COLUMN ═══════════════════════════════ -->
+<div class="left-col">
+
+  <!-- Force inputs -->
+  <div class="card">
+    <div class="card-title accent-blue">Force Parameters</div>
+    <div class="param-list">
+
+      <div class="param">
+        <div class="param-name">T — Applied torque</div>
+        <div class="param-controls">
+          <input type="range"  id="sT"  min="10" max="5000" step="10" value="500" oninput="syncFS('T')">
+          <input type="number" id="nT"  min="10" max="5000" step="10" value="500" oninput="syncNS('T',10,5000)">
+          <span class="param-unit">Nm</span>
+        </div>
+        <div class="param-range"><span>10</span><span>5000 Nm</span></div>
+        <p class="param-desc">External torque the joint must transmit.</p>
+      </div>
+
+      <div class="param">
+        <div class="param-name">R<sub>m</sub> — Mean tooth radius</div>
+        <div class="param-controls">
+          <input type="range"  id="sRm" min="5" max="300" step="1" value="50" oninput="syncFS('Rm')">
+          <input type="number" id="nRm" min="5" max="300" step="1" value="50" oninput="syncNS('Rm',5,300)">
+          <span class="param-unit">mm</span>
+        </div>
+        <div class="param-range"><span>5</span><span>300 mm</span></div>
+        <p class="param-desc">Radius to centroid of tooth ring. = (D+d)/4 for a solid ring.</p>
+      </div>
+
+      <div class="param">
+        <div class="param-name">α — Flank / pressure angle</div>
+        <div class="param-controls">
+          <input type="range"  id="sA"  min="5" max="85" step="0.5" value="30" oninput="syncFS('A')">
+          <input type="number" id="nA"  min="5" max="85" step="0.5" value="30" oninput="syncNS('A',5,85)">
+          <span class="param-unit">deg</span>
+        </div>
+        <div class="param-range"><span>5°</span><span>85°</span></div>
+        <p class="param-desc">Half-angle from Z-axis. Standard = 30° (60° included). <strong style="color:var(--green)">Lower α → lower F_a.</strong></p>
+      </div>
+
+      <div class="param">
+        <div class="param-name">n — Number of teeth</div>
+        <div class="param-controls">
+          <input type="range"  id="sN"  min="6" max="360" step="6" value="36" oninput="syncFS('N')">
+          <input type="number" id="nN"  min="1" max="360" step="1"  value="36" oninput="syncNS('N',1,360)">
+          <span class="param-unit">—</span>
+        </div>
+        <div class="param-range"><span>6</span><span>360</span></div>
+        <p class="param-desc">More teeth → lower F_n and σ per tooth. No effect on total F_a.</p>
+      </div>
+
+      <div class="param">
+        <div class="param-name">ν — Safety factor</div>
+        <div class="param-controls">
+          <input type="range"  id="sNu" min="1.0" max="5.0" step="0.1" value="2.0" oninput="syncFS('Nu')">
+          <input type="number" id="nNu" min="1.0" max="5.0" step="0.1" value="2.0" oninput="syncNS('Nu',1.0,5.0)">
+          <span class="param-unit">—</span>
+        </div>
+        <div class="param-range"><span>1.0</span><span>5.0</span></div>
+        <p class="param-desc">Applied to F_a for bolt preload. Croccolo (2018): ν = 1.8–3.0.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Tooth geometry inputs -->
+  <div class="card">
+    <div class="card-title accent-orange">Tooth Flank Geometry</div>
+    <div class="param-list">
+
+      <div class="param">
+        <div class="param-name">D — Outer diameter of tooth ring</div>
+        <div class="param-controls">
+          <input type="range"  id="sD"  min="10" max="600" step="1" value="120" class="orange-thumb" oninput="syncFS('D')">
+          <input type="number" id="nD"  min="10" max="600" step="1" value="120" oninput="syncNS('D',10,600)">
+          <span class="param-unit">mm</span>
+        </div>
+        <div class="param-range"><span>10</span><span>600 mm</span></div>
+      </div>
+
+      <div class="param">
+        <div class="param-name">d — Inner diameter of tooth ring</div>
+        <div class="param-controls">
+          <input type="range"  id="sd"  min="5" max="580" step="1" value="60" class="orange-thumb" oninput="syncFS('d')">
+          <input type="number" id="nd"  min="5" max="580" step="1" value="60" oninput="syncNS('d',5,580)">
+          <span class="param-unit">mm</span>
+        </div>
+        <div class="param-range"><span>5</span><span>580 mm</span></div>
+      </div>
+
+      <div class="param">
+        <div class="param-name">h — Tooth height (depth of groove)</div>
+        <div class="param-controls">
+          <input type="range"  id="sh"  min="0.5" max="30" step="0.1" value="5" class="orange-thumb" oninput="syncFS('h')">
+          <input type="number" id="nh"  min="0.1" max="30" step="0.1" value="5" oninput="syncNS('h',0.1,30)">
+          <span class="param-unit">mm</span>
+        </div>
+        <div class="param-range"><span>0.5</span><span>30 mm</span></div>
+        <p class="param-desc">Depth of the V-groove. A = (D−d)·h per tooth (projected flank area).</p>
+      </div>
+
+    </div>
+
+    <!-- Allowable stress -->
+    <div class="sigma-row">
+      <label>σ_allow =</label>
+      <input type="number" id="nSigAllow" min="1" max="2000" step="5" value="200" style="width:70px" oninput="calc()">
+      <span class="param-unit">MPa</span>
+      <span class="sigma-hint">Allowable contact stress on flank. Typical alloyed steel: 120–500 MPa (Croccolo Table 1).</span>
+    </div>
+  </div>
+
+  <div class="opt-banner">
+    <strong>Trade-off:</strong> lowering <code>α</code> reduces <code>F_a</code> but raises <code>F_n</code> (for same torque), which increases <code>σ</code>. Increasing <code>n</code> or <code>h</code> reduces <code>σ</code> without affecting <code>F_a</code>. The chart below shows both constraints simultaneously.
+  </div>
+
+</div><!-- /left-col -->
+
+<!-- ═══════════════════════════════ RIGHT COLUMN ═══════════════════════════════ -->
+<div class="right-col">
+
+  <!-- Force outputs (5 cards) -->
+  <div class="out-grid out-grid-5">
+    <div class="out-card col-Ft">
+      <div class="out-label">Total tangential</div>
+      <div class="out-sym">F_t</div>
+      <div class="out-val"><span id="oFt">—</span><span class="out-utag" id="uFt">N</span></div>
+      <div class="out-formula">= T / R_m</div>
+    </div>
+    <div class="out-card col-Ftt">
+      <div class="out-label">Tangential / tooth</div>
+      <div class="out-sym">F_t,tooth</div>
+      <div class="out-val"><span id="oFtt">—</span><span class="out-utag" id="uFtt">N</span></div>
+      <div class="out-formula">= F_t / n</div>
+    </div>
+    <div class="out-card col-Fn">
+      <div class="out-label">Normal / tooth</div>
+      <div class="out-sym">F_n</div>
+      <div class="out-val"><span id="oFn">—</span><span class="out-utag" id="uFn">N</span></div>
+      <div class="out-formula">= F_t,tooth / sin(α)</div>
+    </div>
+    <div class="out-card col-Fa">
+      <div class="out-label">Axial separating ↓min</div>
+      <div class="out-sym">F_a</div>
+      <div class="out-val"><span id="oFa">—</span><span class="out-utag" id="uFa">N</span></div>
+      <div class="out-formula">= T·tan(α)/R_m</div>
+    </div>
+    <div class="out-card col-pre">
+      <div class="out-label">Bolt preload</div>
+      <div class="out-sym">ν·F_a</div>
+      <div class="out-val"><span id="oPreload">—</span><span class="out-utag" id="uPreload">N</span></div>
+      <div class="out-formula">= ν × F_a</div>
+    </div>
+  </div>
+
+  <!-- Stress outputs (3 cards) -->
+  <div class="out-grid out-grid-3">
+    <div class="out-card col-A">
+      <div class="out-label">Projected flank area / tooth</div>
+      <div class="out-sym">A</div>
+      <div class="out-val"><span id="oA">—</span><span class="out-utag" id="uA">mm²</span></div>
+      <div class="out-formula">= (D−d)·h / n × n = (D−d)·h per tooth</div>
+    </div>
+    <div class="out-card col-sig">
+      <div class="out-label">Flank contact stress</div>
+      <div class="out-sym">σ = F_n / A</div>
+      <div class="out-val"><span id="oSig">—</span><span class="out-utag">MPa</span></div>
+      <div class="out-formula">= F_n / [(D−d)·h]</div>
+      <div id="sigBadge" class="stress-badge badge-ok">—</div>
+    </div>
+    <div class="out-card col-sig" style="--col:#f59e0b">
+      <div class="out-label">Stress utilisation σ/σ_allow</div>
+      <div class="out-sym" style="color:var(--amber)">σ / σ_allow</div>
+      <div class="out-val"><span id="oUtil">—</span><span class="out-utag">%</span></div>
+      <div class="out-formula">= σ / σ_allowable × 100</div>
+      <div class="bar-track" style="margin-top:6px;height:6px;">
+        <div class="bar-fill" id="utilBar" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preload bar -->
+  <div class="bar-wrap">
+    <div class="bar-header">Bolt preload = ν · F_a</div>
+    <div class="bar-eq" id="barEq">—</div>
+    <div class="bar-track"><div class="bar-fill" id="barFill" style="width:0%"></div></div>
+    <div class="bar-limits"><span>0 N</span><span>3× reference (T=500,R_m=50,α=30°,ν=2): <span id="barRefVal">—</span></span></div>
+    <div class="insight" id="insightBox">Adjust parameters above.</div>
+  </div>
+
+  <!-- Trade-off chart -->
+  <div class="card" style="flex:1">
+    <div class="card-title accent-purple">Design Space &amp; Sensitivity</div>
+    <div class="chart-tabs">
+      <button class="ctab active" id="tab-tradeoff" onclick="setChart('tradeoff')">σ vs F_a trade-off (α sweep)</button>
+      <button class="ctab"        id="tab-a"        onclick="setChart('a')">F_a vs α</button>
+      <button class="ctab"        id="tab-sig"      onclick="setChart('sig')">σ vs α</button>
+      <button class="ctab"        id="tab-n"        onclick="setChart('n')">F_n &amp; σ vs n</button>
+      <button class="ctab"        id="tab-Rm"       onclick="setChart('Rm')">F_a vs R_m</button>
+    </div>
+    <canvas id="chart" width="820" height="300"></canvas>
+    <div class="insight" id="chartNote" style="margin-top:8px;border-color:var(--accent)">
+      <strong style="color:var(--accent)">Trade-off chart:</strong>
+      Each point is a different α. Moving right (higher α) → higher F_a (bad for bolts). Moving up (higher σ) → more stress on tooth flank. The <span style="color:var(--orange)">orange dashed line</span> is σ_allowable. The <span style="color:var(--red)">red dot</span> is your current design. Aim for bottom-left, staying below the orange line.
+    </div>
+  </div>
+
+</div><!-- /right-col -->
+</div><!-- /main-grid -->
+</div><!-- /shell -->
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════
+   Colour constants — pre-defined, no string hacking
+══════════════════════════════════════════════════ */
+const C={
+  red:'#f43f5e',     redFill:'rgba(244,63,94,0.10)',
+  green:'#22d3a0',   greenFill:'rgba(34,211,160,0.08)',
+  cyan:'#22d3ee',    cyanFill:'rgba(34,211,238,0.08)',
+  purple:'#a78bfa',  purpleFill:'rgba(167,139,250,0.10)',
+  amber:'#f59e0b',   amberFill:'rgba(245,158,11,0.08)',
+  orange:'#fb923c',  orangeFill:'rgba(251,146,60,0.10)',
+  muted:'#546080', border:'#2a3a55', grid:'#1a2438',
+  chartBg:'#0d1018', bright:'#e8f0ff',
+};
+
+let currentChart='tradeoff';
+
+/* ══════════════════════════════════════════════════
+   Slider ↔ number sync
+══════════════════════════════════════════════════ */
+function syncFS(k){ // slider → number
+  document.getElementById('n'+k).value=document.getElementById('s'+k).value;
+  calc();
+}
+function syncNS(k,lo,hi){ // number → slider (with clamp)
+  let v=parseFloat(document.getElementById('n'+k).value);
+  if(isNaN(v))return;
+  v=Math.max(lo,Math.min(hi,v));
+  document.getElementById('s'+k).value=v;
+  document.getElementById('n'+k).value=v;
+  calc();
+}
+
+/* ══════════════════════════════════════════════════
+   Read all parameters
+══════════════════════════════════════════════════ */
+function getP(){
+  const aDeg=parseFloat(document.getElementById('sA').value);
+  const D=parseFloat(document.getElementById('sD').value);
+  const d=parseFloat(document.getElementById('sd').value);
+  const h=parseFloat(document.getElementById('sh').value);
+  return{
+    T:   parseFloat(document.getElementById('sT').value),
+    Rm:  parseFloat(document.getElementById('sRm').value)/1000,
+    aDeg,
+    a:   aDeg*Math.PI/180,
+    n:   Math.max(1,parseInt(document.getElementById('sN').value)),
+    nu:  parseFloat(document.getElementById('sNu').value),
+    D,d,h,
+    sigAllow: parseFloat(document.getElementById('nSigAllow').value)||200,
+  };
+}
+
+/* ══════════════════════════════════════════════════
+   Core maths
+══════════════════════════════════════════════════ */
+function compute(T,Rm,a,n,nu,D,d,h){
+  if(Rm<=0||a<=0||n<=0)return{Ft:0,Ft_tooth:0,Fn:0,Fa:0,preload:0,A:0,sigma:0};
+  const Ft      =T/Rm;
+  const Ft_tooth=Ft/n;
+  const Fn      =Ft_tooth/Math.sin(a);
+  const Fa      =T*Math.tan(a)/Rm;
+  const preload =nu*Fa;
+  // per-tooth projected area: (D-d)*h, where D,d in mm → convert to m²
+  const A_mm2   =(D-d)*h;             // mm²  (per tooth, as specified)
+  const A_m2    =A_mm2*1e-6;          // m²
+  const sigma   =A_m2>0?Fn/A_m2:Infinity; // Pa
+  const sigma_MPa= sigma/1e6;
+  return{Ft,Ft_tooth,Fn,Fa,preload,A_mm2,A_m2,sigma_MPa};
+}
+
+/* ══════════════════════════════════════════════════
+   Number formatting
+══════════════════════════════════════════════════ */
+function fmtV(v){
+  if(!isFinite(v)||isNaN(v))return{num:'∞',unit:''};
+  if(v>=1e6)return{num:(v/1e6).toFixed(2),unit:'MN'};
+  if(v>=1e3)return{num:(v/1e3).toFixed(2),unit:'kN'};
+  return{num:v.toFixed(1),unit:'N'};
+}
+function fmtS(v){const f=fmtV(v);return f.num+(f.unit?' '+f.unit:'');}
+function setOut(numId,unitId,val){
+  const f=fmtV(val);
+  document.getElementById(numId).textContent=f.num;
+  if(unitId)document.getElementById(unitId).textContent=f.unit;
+}
+
+/* ══════════════════════════════════════════════════
+   Reference joint (fixed benchmark)
+══════════════════════════════════════════════════ */
+const REF=compute(500,0.05,30*Math.PI/180,36,2.0,120,60,5);
+
+/* ══════════════════════════════════════════════════
+   Main update
+══════════════════════════════════════════════════ */
+function calc(){
+  const p=getP();
+  const r=compute(p.T,p.Rm,p.a,p.n,p.nu,p.D,p.d,p.h);
+
+  /* Force outputs */
+  setOut('oFt','uFt',r.Ft);
+  setOut('oFtt','uFtt',r.Ft_tooth);
+  setOut('oFn','uFn',r.Fn);
+  setOut('oFa','uFa',r.Fa);
+  setOut('oPreload','uPreload',r.preload);
+
+  /* Stress outputs */
+  document.getElementById('oA').textContent=r.A_mm2.toFixed(1);
+  document.getElementById('uA').textContent='mm²';
+  const sigMPa=r.sigma_MPa;
+  document.getElementById('oSig').textContent=isFinite(sigMPa)?sigMPa.toFixed(1):'∞';
+  const util=isFinite(sigMPa)?(sigMPa/p.sigAllow*100):999;
+  document.getElementById('oUtil').textContent=isFinite(util)?util.toFixed(1):'∞';
+
+  /* Stress badge */
+  const badge=document.getElementById('sigBadge');
+  const utilBar=document.getElementById('utilBar');
+  if(util<=80){
+    badge.className='stress-badge badge-ok'; badge.textContent='OK — below 80% allowable';
+    utilBar.style.background=C.green;
+  } else if(util<=100){
+    badge.className='stress-badge badge-warn'; badge.textContent='CAUTION — 80–100% allowable';
+    utilBar.style.background=C.amber;
+  } else {
+    badge.className='stress-badge badge-over'; badge.textContent='OVER LIMIT — exceeds σ_allow';
+    utilBar.style.background=C.red;
+  }
+  utilBar.style.width=Math.min(util,100)+'%';
+
+  /* Preload bar */
+  document.getElementById('barRefVal').textContent=fmtS(REF.preload);
+  document.getElementById('barEq').textContent=
+    'ν × F_a = '+p.nu.toFixed(1)+' × '+fmtS(r.Fa)+' = '+fmtS(r.preload);
+  const barMax=REF.preload*3;
+  const pct=isFinite(r.preload)?Math.min(r.preload/barMax*100,100):100;
+  const bfill=document.getElementById('barFill');
+  bfill.style.width=pct+'%';
+  const ratio=REF.preload>0?r.preload/REF.preload:1;
+  bfill.style.background=ratio<1?C.green:ratio<2?C.amber:C.red;
+
+  /* Insight */
+  const deg=p.aDeg;
+  const stdFa=compute(p.T,p.Rm,30*Math.PI/180,p.n,p.nu,p.D,p.d,p.h).Fa;
+  const box=document.getElementById('insightBox');
+  let msg,cls;
+  const overStress=util>100;
+  const warnStress=util>80;
+
+  if(overStress){
+    msg='<strong>Over stress limit:</strong> σ = '+sigMPa.toFixed(1)+' MPa exceeds σ_allow = '+p.sigAllow+' MPa ('
+        +util.toFixed(0)+'%). '
+        +'Reduce α (lowers F_n), increase n (shares load) or increase h or (D−d) (larger area).';
+    cls='insight bad';
+  } else if(deg<15&&!overStress){
+    msg='<strong>Excellent F_a:</strong> α = '+deg.toFixed(1)+'° gives F_a = '+fmtS(r.Fa)
+        +' ('+(100*(1-r.Fa/stdFa)).toFixed(0)+'% below standard). σ = '+sigMPa.toFixed(1)+' MPa ('
+        +util.toFixed(0)+'% utilisation). Check tooth root bending.';
+    cls='insight';
+  } else if(deg<30&&!overStress){
+    msg='<strong>Good:</strong> α = '+deg.toFixed(1)+'° — F_a = '+fmtS(r.Fa)
+        +', '+(100*(1-r.Fa/stdFa)).toFixed(0)+'% below standard. σ = '+sigMPa.toFixed(1)
+        +' MPa ('+util.toFixed(0)+'%).';
+    cls='insight';
+  } else if(deg<30.3&&!overStress){
+    msg='<strong>Standard:</strong> α = 30° — F_a = '+fmtS(r.Fa)+'. σ = '+sigMPa.toFixed(1)
+        +' MPa ('+util.toFixed(0)+'% of limit).';
+    cls='insight';
+  } else if(warnStress){
+    msg='<strong>Stress warning:</strong> σ = '+sigMPa.toFixed(1)+' MPa = '+util.toFixed(0)
+        +'% of σ_allow. Consider more teeth n, larger h, or smaller α to reduce F_n.';
+    cls='insight warn';
+  } else {
+    msg='<strong>Note:</strong> α = '+deg.toFixed(1)+'° — F_a = '+fmtS(r.Fa)
+        +' ('+(100*(r.Fa/stdFa-1)).toFixed(0)+'% above standard). σ = '+sigMPa.toFixed(1)
+        +' MPa ('+util.toFixed(0)+'%).';
+    cls=deg>45?'insight bad':'insight warn';
+  }
+  box.className=cls; box.innerHTML=msg;
+
+  drawChart(currentChart);
+}
+
+/* ══════════════════════════════════════════════════
+   Chart system
+══════════════════════════════════════════════════ */
+function setChart(k){
+  currentChart=k;
+  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+k).classList.add('active');
+  const note=document.getElementById('chartNote');
+  if(k==='tradeoff'){
+    note.innerHTML='<strong style="color:var(--accent)">Trade-off (α sweep):</strong> Each point = one α value (5°→85°). X-axis = F_a, Y-axis = σ. <span style="color:var(--orange)">Orange line</span> = σ_allowable. <span style="color:var(--red)">Red dot</span> = current design. <span style="color:var(--green)">Green zone</span> = feasible. Aim for bottom-left of the feasible region.';
+  } else if(k==='sig'){
+    note.innerHTML='<strong style="color:var(--accent)">σ vs α:</strong> As α decreases, F_n rises (for same torque), so stress increases. The <span style="color:var(--orange)">orange line</span> shows σ_allowable. Stay below it.';
+  } else {
+    note.innerHTML='<strong style="color:var(--accent)">Sensitivity:</strong> The curve shows how the selected output varies across the full parameter range. The <span style="color:var(--red)">red dot</span> marks your current position.';
+  }
+  drawChart(k);
+}
+
+/* ── Canvas drawing helpers ── */
+function makeCtx(){
+  const cv=document.getElementById('chart');
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  return{cv,ctx,W:cv.width,H:cv.height};
+}
+
+function drawAxes(ctx,PAD,IW,IH,W,H,xLabel,yLabel,xMin,xMax,yMin,yMax,xDp,yFmt){
+  // background
+  ctx.fillStyle=C.chartBg; ctx.fillRect(PAD.l,PAD.t,IW,IH);
+  // grid
+  ctx.save(); ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const y=PAD.t+(i/5)*IH;
+    const v=yMax-(i/5)*(yMax-yMin);
+    ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+IW,y);ctx.stroke();
+    ctx.fillStyle=C.muted; ctx.font='10px "JetBrains Mono",monospace'; ctx.textAlign='right';
+    const lbl=yFmt?yFmt(v):v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'k':v.toFixed(0);
+    ctx.fillText(lbl,PAD.l-5,y+4);
+  }
+  for(let i=0;i<=5;i++){
+    const x=PAD.l+(i/5)*IW;
+    const v=xMin+(i/5)*(xMax-xMin);
+    ctx.beginPath();ctx.moveTo(x,PAD.t);ctx.lineTo(x,PAD.t+IH);ctx.stroke();
+    ctx.fillStyle=C.muted; ctx.textAlign='center';
+    ctx.fillText(v.toFixed(xDp!==undefined?xDp:0),x,PAD.t+IH+15);
+  }
+  ctx.restore();
+  // axes lines
+  ctx.save(); ctx.strokeStyle=C.border; ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(PAD.l,PAD.t);ctx.lineTo(PAD.l,PAD.t+IH);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(PAD.l,PAD.t+IH);ctx.lineTo(PAD.l+IW,PAD.t+IH);ctx.stroke();
+  // labels
+  ctx.fillStyle=C.muted; ctx.font='10px "JetBrains Mono",monospace'; ctx.textAlign='center';
+  ctx.fillText(xLabel,PAD.l+IW/2,H-4);
+  ctx.save(); ctx.translate(12,PAD.t+IH/2); ctx.rotate(-Math.PI/2); ctx.fillText(yLabel,0,0); ctx.restore();
+  ctx.restore();
+}
+
+function drawCurve(ctx,toX,toY,xs,ys,stroke,fillCol,lw=2.5){
+  if(!ys.length)return;
+  ctx.save();
+  ctx.beginPath();
+  ys.forEach((v,i)=>{const px=toX(xs[i]),py=toY(v);i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);});
+  ctx.lineTo(toX(xs[xs.length-1]),toY(0));
+  ctx.lineTo(toX(xs[0]),toY(0));
+  ctx.closePath(); ctx.fillStyle=fillCol; ctx.fill();
+  ctx.beginPath();
+  ys.forEach((v,i)=>{const px=toX(xs[i]),py=toY(v);i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);});
+  ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.lineJoin='round'; ctx.stroke();
+  ctx.restore();
+}
+
+function drawDot(ctx,cx,cy,stroke,ys,idx,toX,xs,IW,PAD){
+  ctx.save();
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(cx,PAD.t);ctx.lineTo(cx,PAD.t+IW*0+PAD.t+(ys.length>0?200:200));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(PAD.l,cy);ctx.lineTo(PAD.l+IW,cy);ctx.stroke();
+  ctx.setLineDash([]);
+  const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,13);
+  glow.addColorStop(0,'rgba(255,255,255,0.20)'); glow.addColorStop(1,'rgba(255,255,255,0.00)');
+  ctx.fillStyle=glow; ctx.beginPath();ctx.arc(cx,cy,13,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);
+  ctx.fillStyle='#fff'; ctx.strokeStyle=stroke; ctx.lineWidth=2.5; ctx.fill();ctx.stroke();
+  ctx.restore();
+}
+
+function refLine(ctx,toY,val,PAD,IW,label,col){
+  const y=toY(val);
+  ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
+  ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+IW,y);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle=col; ctx.font='9px "JetBrains Mono",monospace'; ctx.textAlign='right';
+  ctx.fillText(label,PAD.l+IW-4,y-4);
+  ctx.restore();
+}
+
+/* ══════════════════════════════════════════════════
+   Chart dispatcher
+══════════════════════════════════════════════════ */
+function drawChart(key){
+  const{cv,ctx,W,H}=makeCtx();
+  const p=getP();
+  const PAD={l:70,t:24,r:20,b:46};
+  const IW=W-PAD.l-PAD.r, IH=H-PAD.t-PAD.b;
+  const STEPS=300;
+
+  if(key==='tradeoff'){
+    // Sweep α, compute (Fa, sigma) pairs — this is the Pareto frontier
+    const faArr=[], sigArr=[];
+    for(let i=0;i<=STEPS;i++){
+      const deg=5+(i/STEPS)*80;
+      const a=deg*Math.PI/180;
+      const rr=compute(p.T,p.Rm,a,p.n,p.nu,p.D,p.d,p.h);
+      faArr.push(rr.Fa); sigArr.push(rr.sigma_MPa);
+    }
+    const currR=compute(p.T,p.Rm,p.a,p.n,p.nu,p.D,p.d,p.h);
+
+    const xMax=Math.max(...faArr.filter(isFinite))*1.1||1;
+    const yMax=Math.max(Math.max(...sigArr.filter(isFinite))*1.1,p.sigAllow*1.2)||1;
+
+    const toX=v=>PAD.l+Math.max(0,Math.min(1,v/xMax))*IW;
+    const toY=v=>PAD.t+IH-Math.max(0,Math.min(1,v/yMax))*IH;
+
+    // Background
+    ctx.fillStyle=C.chartBg; ctx.fillRect(PAD.l,PAD.t,IW,IH);
+
+    // Feasible zone (below sigma_allow) — green tint
+    const yAllowCanvas=toY(p.sigAllow);
+    if(yAllowCanvas>PAD.t){
+      ctx.fillStyle='rgba(34,211,160,0.05)';
+      ctx.fillRect(PAD.l,yAllowCanvas,IW,PAD.t+IH-yAllowCanvas);
+    }
+
+    // Grid
+    ctx.save(); ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+    for(let i=0;i<=5;i++){
+      const y=PAD.t+(i/5)*IH;
+      const v=yMax*(1-i/5);
+      ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+IW,y);ctx.stroke();
+      ctx.fillStyle=C.muted;ctx.font='10px "JetBrains Mono",monospace';ctx.textAlign='right';
+      ctx.fillText(v.toFixed(0),PAD.l-5,y+4);
+      const x=PAD.l+(i/5)*IW;
+      const vx=xMax*(i/5);
+      ctx.beginPath();ctx.moveTo(x,PAD.t);ctx.lineTo(x,PAD.t+IH);ctx.stroke();
+      ctx.textAlign='center';
+      ctx.fillText(vx>=1e3?(vx/1e3).toFixed(1)+'k':vx.toFixed(0),x,PAD.t+IH+15);
+    }
+    ctx.restore();
+
+    // Allowable stress line
+    refLine(ctx,toY,p.sigAllow,PAD,IW,'σ_allow = '+p.sigAllow+' MPa','rgba(251,146,60,0.9)');
+
+    // Pareto curve — colour segments by feasibility
+    ctx.save();
+    for(let i=0;i<faArr.length-1;i++){
+      const feasible=sigArr[i]<=p.sigAllow;
+      ctx.beginPath();
+      ctx.moveTo(toX(faArr[i]),toY(sigArr[i]));
+      ctx.lineTo(toX(faArr[i+1]),toY(sigArr[i+1]));
+      ctx.strokeStyle=feasible?C.green:C.red;
+      ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.stroke();
+    }
+    ctx.restore();
+
+    // Direction arrows annotation
+    ctx.save();
+    ctx.fillStyle='rgba(34,211,160,0.5)'; ctx.font='bold 10px "JetBrains Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText('← lower α',PAD.l+6,PAD.t+IH-8);
+    ctx.fillStyle='rgba(244,63,94,0.5)';
+    ctx.fillText('higher α →',PAD.l+IW-80,PAD.t+IH-8);
+    ctx.restore();
+
+    // Current design dot
+    const cx=toX(currR.Fa), cy=toY(currR.sigma_MPa);
+    ctx.save();
+    const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,14);
+    glow.addColorStop(0,'rgba(244,63,94,0.35)'); glow.addColorStop(1,'rgba(244,63,94,0)');
+    ctx.fillStyle=glow; ctx.beginPath();ctx.arc(cx,cy,14,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.strokeStyle=C.red; ctx.lineWidth=2.5; ctx.fill();ctx.stroke();
+    // label
+    ctx.fillStyle=C.bright; ctx.font='bold 10px "JetBrains Mono",monospace';
+    ctx.textAlign=cx>PAD.l+IW*0.6?'right':'left';
+    ctx.fillText('α='+p.aDeg.toFixed(1)+'° | F_a='+fmtS(currR.Fa)+' | σ='+currR.sigma_MPa.toFixed(1)+'MPa',
+      cx>PAD.l+IW*0.6?cx-10:cx+10, cy-10);
+    ctx.restore();
+
+    // Axes labels
+    ctx.save();
+    ctx.strokeStyle=C.border; ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(PAD.l,PAD.t);ctx.lineTo(PAD.l,PAD.t+IH);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(PAD.l,PAD.t+IH);ctx.lineTo(PAD.l+IW,PAD.t+IH);ctx.stroke();
+    ctx.fillStyle=C.muted; ctx.font='10px "JetBrains Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('F_a — Axial separating force (N)',PAD.l+IW/2,H-4);
+    ctx.save();ctx.translate(12,PAD.t+IH/2);ctx.rotate(-Math.PI/2);ctx.fillText('σ — Flank contact stress (MPa)',0,0);ctx.restore();
+    ctx.restore();
+
+  } else {
+    // ── Single-variable sensitivity charts ──
+    const xs=[],ys=[],ys2=[];
+    let xLabel='',yLabel='',currentX=0,showTwo=false;
+
+    if(key==='a'){
+      for(let i=0;i<=STEPS;i++){
+        const d=5+(i/STEPS)*80; xs.push(d);
+        ys.push(compute(p.T,p.Rm,d*Math.PI/180,p.n,p.nu,p.D,p.d,p.h).Fa);
+      }
+      xLabel='α (°)'; yLabel='F_a (N)'; currentX=p.aDeg;
+
+    } else if(key==='sig'){
+      for(let i=0;i<=STEPS;i++){
+        const d=5+(i/STEPS)*80; xs.push(d);
+        ys.push(compute(p.T,p.Rm,d*Math.PI/180,p.n,p.nu,p.D,p.d,p.h).sigma_MPa);
+      }
+      xLabel='α (°)'; yLabel='σ (MPa)'; currentX=p.aDeg;
+
+    } else if(key==='Rm'){
+      for(let i=0;i<=STEPS;i++){
+        const mm=5+(i/STEPS)*295; xs.push(mm);
+        ys.push(compute(p.T,mm/1000,p.a,p.n,p.nu,p.D,p.d,p.h).Fa);
+      }
+      xLabel='R_m (mm)'; yLabel='F_a (N)'; currentX=p.Rm*1000;
+
+    } else { // n
+      for(let i=0;i<=STEPS;i++){
+        const n=Math.max(1,Math.round(6+(i/STEPS)*354)); xs.push(n);
+        const rr=compute(p.T,p.Rm,p.a,n,p.nu,p.D,p.d,p.h);
+        ys.push(rr.Fn); ys2.push(rr.sigma_MPa);
+      }
+      xLabel='n (teeth)'; yLabel='F_n (N) & σ (MPa)'; currentX=p.n; showTwo=true;
+    }
+
+    const allY=showTwo?ys.concat(ys2):ys;
+    const yMax=Math.max(...allY.filter(isFinite))*1.12||1;
+    const yMin=0;
+    const xMin=xs[0], xMax=xs[xs.length-1];
+    const toX=v=>PAD.l+(Math.max(xMin,Math.min(xMax,v))-xMin)/(xMax-xMin)*IW;
+    const toY=v=>PAD.t+IH-Math.max(0,Math.min(1,(v-yMin)/(yMax-yMin)))*IH;
+
+    const mainStroke=showTwo?C.purple:key==='sig'?C.orange:C.red;
+    const mainFill  =showTwo?C.purpleFill:key==='sig'?C.orangeFill:C.redFill;
+
+    drawAxes(ctx,PAD,IW,IH,W,H,xLabel,yLabel,xMin,xMax,yMin,yMax,
+      key==='a'||key==='sig'?1:0,null);
+    drawCurve(ctx,toX,toY,xs,ys,mainStroke,mainFill);
+
+    if(showTwo){
+      drawCurve(ctx,toX,toY,xs,ys2,C.orange,C.orangeFill,2);
+      ctx.save();
+      ctx.font='11px "JetBrains Mono",monospace';
+      ctx.fillStyle=C.purple;ctx.textAlign='left';ctx.fillText('● F_n / tooth',PAD.l+6,PAD.t+14);
+      ctx.fillStyle=C.orange;ctx.fillText('● σ (MPa)',PAD.l+110,PAD.t+14);
+      ctx.restore();
+    }
+
+    // Sigma allow reference line (on sigma and n charts)
+    if(key==='sig'){
+      refLine(ctx,toY,p.sigAllow,PAD,IW,'σ_allow = '+p.sigAllow+' MPa','rgba(251,146,60,0.9)');
+    }
+    if(key==='n'&&p.sigAllow<=yMax){
+      refLine(ctx,toY,p.sigAllow,PAD,IW,'σ_allow','rgba(251,146,60,0.9)');
+    }
+
+    // Standard 30° reference line
+    if(key==='a'||key==='sig'){
+      const rx=toX(30);
+      ctx.save(); ctx.strokeStyle='rgba(245,158,11,0.35)'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+      ctx.beginPath();ctx.moveTo(rx,PAD.t);ctx.lineTo(rx,PAD.t+IH);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='rgba(245,158,11,0.6)'; ctx.font='9px "JetBrains Mono",monospace'; ctx.textAlign='left';
+      ctx.fillText('Std 30°',rx+3,PAD.t+12);
+      ctx.restore();
+    }
+
+    // Current-value dot
+    const fracX=(currentX-xMin)/(xMax-xMin);
+    const idx=Math.max(0,Math.min(STEPS-1,Math.round(fracX*STEPS)));
+    const cx=toX(currentX), cy=toY(ys[idx]);
+    ctx.save();
+    ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(cx,PAD.t);ctx.lineTo(cx,PAD.t+IH);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(PAD.l,cy);ctx.lineTo(PAD.l+IW,cy);ctx.stroke();
+    ctx.setLineDash([]);
+    const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,13);
+    glow.addColorStop(0,'rgba(255,255,255,0.20)');glow.addColorStop(1,'rgba(255,255,255,0.00)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(cx,cy,13,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);
+    ctx.fillStyle='#fff';ctx.strokeStyle=mainStroke;ctx.lineWidth=2.5;ctx.fill();ctx.stroke();
+    // value label
+    const dotV=ys[idx];
+    const dotStr=key==='sig'?dotV.toFixed(1)+' MPa':fmtS(dotV);
+    ctx.fillStyle=C.bright;ctx.font='bold 11px "JetBrains Mono",monospace';
+    const anchor=cx>PAD.l+IW*0.65?'right':'left';
+    ctx.textAlign=anchor;
+    ctx.fillText(dotStr,anchor==='right'?cx-10:cx+10,cy-10);
+    ctx.restore();
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   Init
+══════════════════════════════════════════════════ */
+calc();
+</script>
+</body>
+</html>
